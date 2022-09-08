@@ -1,5 +1,3 @@
-line = input()
-tokens = line.split()
 oo = 1e9
 operators = {
     "=": "assign",
@@ -60,6 +58,9 @@ class Token:
                 "<" + self.lexema + "," + str(self.row) + "," + str(self.column) + ">"
             )
         else:
+            id_tkn = self.token_id
+            if id_tkn != "id":
+                id_tkn = "tkn_" + id_tkn
             return (
                 "<" + self.token_id  + ","+ self.lexema + "," + str(self.row) + "," + str(self.column) + ">"
             )
@@ -79,66 +80,99 @@ def isfloat(element):
     else:
         return True
 
+def is_number_with_semicolon(element):
+    if len(element) <= 1:
+        return False
+    if element[1:].isnumeric():
+        return True
+
 def is_number_with_sign(element):
     if len(element) <= 1:
         return False
     if element[1:].isnumeric():
         return True
+
 def is_float_with_sign(element):
     if len(element) <= 1:
         return False
     if isfloat(element[1:]):
         return True
 
-state = 0
-row, column = 1,1
-for lexema in tokens:
-    token = None
-    if lexema in reserved_words:
-        token = Token(row,column,lexema)
-    elif lexema in operators:
-        token = Token(row,column,lexema, operators[lexema])
-    elif lexema.isnumeric():
-        token = Token(row,column,lexema, "integer")
-        pass
-    elif isfloat(lexema):
-        token = Token(row,column,lexema, "float")
-        pass
-    elif is_number_with_sign(lexema):
-        sign = "plus"
-        if lexema[0] == '-':
-            sign = "minus"
-        token = Token(row,column,lexema[0], sign)
-        token = Token(row,column,lexema[1:], "integer")
-    elif is_float_with_sign(lexema):
-        sign = "plus"
-        if lexema[0] == '-':
-            sign = "minus"
-        token = Token(row,column,lexema[0], sign)
-        token = Token(row,column,lexema[1:], "float")
-    else:
-        token = Token(row,column,"",token_id = "id")
-        for c in lexema:
-            if state == 0:
-                if isalphabetic(c):
-                    token.add_lexema(c)
-                    state = 1
-                else:
-                    state = -1
-            elif state == 1:
-                if isalphabetic(c) or c == "_":
-                    token.add_lexema(c)
-                    continue
-                else:
-                    state = -1
-            if state == -1:
-                break
-    if state == -1:
-        #TODO make error
-        pass
-    else:
-        print(token)
-    
+def is_float_with_semicolon(element):
+    if len(element) <= 1:
+        return False
+    if isfloat(element[:-1]):
+        return True
+
+while True:
+    line = ""
+    try:
+        line = input()
+    except EOFError:
+        break
+    state = 0
+    stack = line.split()
+    if stack[0] == "//":
+        continue
+    row, column = 1,1
+    for lexema in stack:
+        token = None
+        token2 = None
+        if lexema in reserved_words:
+            token = Token(row,column,lexema)
+        elif lexema in operators:
+            token = Token(row,column,lexema, operators[lexema])
+        elif lexema.isnumeric():
+            token = Token(row,column,lexema, "integer")
+        elif isfloat(lexema):
+            token = Token(row,column,lexema, "float")
+        elif is_number_with_sign(lexema):
+            sign = "plus"
+            if lexema[0] == '-':
+                sign = "minus"
+            token = Token(row,column,lexema[0], sign)
+            token2 = Token(row,column,lexema[1:], "integer")
+        elif is_float_with_sign(lexema):
+            sign = "plus"
+            if lexema[0] == '-':
+                sign = "minus"
+            token = Token(row,column,lexema[0], sign)
+            token2 = Token(row,column,lexema[1:], "float")
+        elif is_float_with_semicolon(lexema):
+            sign = "semicolon"
+            token = Token(row,column,lexema[:-1], "float")
+            token2 = Token(row,column,lexema[-1], sign)
+        elif is_number_with_semicolon(lexema):
+            sign = "semicolon"
+            token = Token(row,column,lexema[:-1], "integer")
+            token2 = Token(row,column,lexema[-1], sign)
+        else:
+            #TODO encontrar lexemas que no estan separados
+            for i in range(len(lexema),-1,-1):
+            # automaton for identify a complex id 
+            token = Token(row,column,"",token_id = "id")
+            for c in lexema:
+                if state == 0:
+                    if isalphabetic(c):
+                        token.add_lexema(c)
+                        state = 1
+                    else:
+                        state = -1
+                elif state == 1:
+                    if isalphabetic(c) or c == "_":
+                        token.add_lexema(c)
+                        continue
+                    else:
+                        state = -1
+                if state == -1:
+                    break
+        if state == -1:
+            print('>>> Error lexico (linea: %s, posicion: %s)' %(row, column))
+        else:
+            print(token)
+            if token2 != None:
+                print(token2)
+        
+        #Add the size of word and 1 cause of the space
+        column += len(lexema)+ 1
     row += 1
-    #Add the size of word and 1 cause of the space
-    column += len(lexema)+ 1
