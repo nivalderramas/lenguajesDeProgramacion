@@ -1,4 +1,20 @@
-oo = 1e9
+import re
+
+VARS_REGEX = "(([a-z]|[A-Z])+(_|[0-9])*)+"
+STRING_REGEX = (
+    r"""(?=["])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*)"""
+)
+COMMENT_REGEX = r"//.*"
+INT_REGEX = r"[0-9]+"
+FLOAT_REGEX = r"\d+\.\d+"
+
+regex = {
+    VARS_REGEX: "id",
+    COMMENT_REGEX: "comment",
+    STRING_REGEX: "str",
+    INT_REGEX: "integer",
+    FLOAT_REGEX: "float",
+}
 operators = {
     "=": "assign",
     ".": "period",
@@ -23,20 +39,37 @@ operators = {
 }
 
 reserved_words = {
-    "for",
-    "float",
-    "size",
-    "integer",
+    "Get",
+    "next",
+    "input",
+    "Put",
+    "to",
+    "output",
     "if",
     "elseif",
-    "Get",
-    "Put",
+    "else",
+    "while",
+    "for",
+    "integer",
+    "float",
     "array",
     "Function",
+    "returns",
     "SquareRoot",
     "RaiseToPower",
     "AbsoluteValue",
     "RandomNumber",
+    "SeedRandomNumbers",
+    "with",
+    "decimal",
+    "places",
+    "size",
+    "Main",
+    "or",
+    "and",
+    "nothing",
+    "not",
+    "evaluates",
 }
 
 class Token:
@@ -57,122 +90,134 @@ class Token:
             return (
                 "<" + self.lexema + "," + str(self.row) + "," + str(self.column) + ">"
             )
+        elif self.lexema in operators:
+            return (
+                "<"
+                + "tkn_"
+                + self.token_id
+                + ","
+                + str(self.row)
+                + ","
+                + str(self.column)
+                + ">"
+            )
         else:
             id_tkn = self.token_id
             if id_tkn != "id":
                 id_tkn = "tkn_" + id_tkn
             return (
-                "<" + self.token_id  + ","+ self.lexema + "," + str(self.row) + "," + str(self.column) + ">"
+                "<"
+                + id_tkn
+                + ","
+                + self.lexema
+                + ","
+                + str(self.row)
+                + ","
+                + str(self.column)
+                + ">"
             )
 
 
-
-def isalphabetic(c):
-    if (ord(c) >= 97 and ord(c) <= 122) or (ord(c) >= 65 and ord(c) <= 90):
-        return True
-    return False
-
-def isfloat(element):
-    try:
-        float(element)
-    except ValueError:
+# Try to create a new token using the provided regex
+# returns the created token
+def try_regex(token, REGEX):
+    if not is_begin_of_line and REGEX == COMMENT_REGEX:
+        return False
+    word = token[0]
+    row = token[1]
+    col = token[2]
+    reg = re.compile(REGEX)
+    result = reg.match(word)
+    name = regex[REGEX]
+    if result == None:
+        return False
+    word_result = str(result[0])
+    if word != word_result:
         return False
     else:
-        return True
+        if REGEX == STRING_REGEX:
+            word = word[1:-1]
+        tkn = Token(row, col, word, name)
+        return tkn
 
-def is_number_with_semicolon(element):
-    if len(element) <= 1:
-        return False
-    if element[1:].isnumeric():
-        return True
 
-def is_number_with_sign(element):
-    if len(element) <= 1:
-        return False
-    if element[1:].isnumeric():
-        return True
+def match(token):
+    word = token[0]
+    row = token[1]
+    col = token[2]
+    # try reserved word
+    if word in reserved_words:
+        tkn = Token(row, col, word)
+        return tkn
+    # try operator
+    if word in operators:
+        tkn = Token(row, col, word, operators[word])
+        return tkn
+    # try COMMENT_REGEX
+    tkn = try_regex(token, COMMENT_REGEX)
+    if tkn != False:
+        return tkn
+    # try string
+    tkn = try_regex(token, STRING_REGEX)
+    if tkn != False:
+        return tkn
+    # try id
+    tkn = try_regex(token, VARS_REGEX)
+    if tkn != False:
+        return tkn
+    # try int
+    tkn = try_regex(token, INT_REGEX)
+    if tkn != False:
+        return tkn
+    # try float
+    tkn = try_regex(token, FLOAT_REGEX)
+    if tkn != False:
+        return tkn
+    return False
 
-def is_float_with_sign(element):
-    if len(element) <= 1:
-        return False
-    if isfloat(element[1:]):
-        return True
 
-def is_float_with_semicolon(element):
-    if len(element) <= 1:
-        return False
-    if isfloat(element[:-1]):
-        return True
+def solve(line, row, col):
+    delta = len(line) - len(line.lstrip(" "))
+    line = line.lstrip(" ")
+    i = len(line)
+    while i > 0:
+        left_part = line[:i]
+        right_part = line[i:]
+        ans = match((left_part, row, col + 1 + delta))
+        if ans != False:
+            if ans.token_id != "comment":
+                print(ans)
+            # print("match",left_part,":",len(left_part),"D",delta)
+            return (right_part, row, col + len(left_part) + delta)
+        i -= 1
+    ##TODO implement error
+    return (False, row, col + 1 + delta)
 
+
+stack = []
+row = 0
+col = 0
+is_begin_of_line = True
+error = False
 while True:
     line = ""
     try:
-        line = input()
+        line = input().rstrip()
+        is_begin_of_line = True
+        row += 1
+        col = 0
+        if line == "":
+            continue
     except EOFError:
         break
-    state = 0
-    stack = line.split()
-    if stack[0] == "//":
-        continue
-    row, column = 1,1
-    for lexema in stack:
-        token = None
-        token2 = None
-        if lexema in reserved_words:
-            token = Token(row,column,lexema)
-        elif lexema in operators:
-            token = Token(row,column,lexema, operators[lexema])
-        elif lexema.isnumeric():
-            token = Token(row,column,lexema, "integer")
-        elif isfloat(lexema):
-            token = Token(row,column,lexema, "float")
-        elif is_number_with_sign(lexema):
-            sign = "plus"
-            if lexema[0] == '-':
-                sign = "minus"
-            token = Token(row,column,lexema[0], sign)
-            token2 = Token(row,column,lexema[1:], "integer")
-        elif is_float_with_sign(lexema):
-            sign = "plus"
-            if lexema[0] == '-':
-                sign = "minus"
-            token = Token(row,column,lexema[0], sign)
-            token2 = Token(row,column,lexema[1:], "float")
-        elif is_float_with_semicolon(lexema):
-            sign = "semicolon"
-            token = Token(row,column,lexema[:-1], "float")
-            token2 = Token(row,column,lexema[-1], sign)
-        elif is_number_with_semicolon(lexema):
-            sign = "semicolon"
-            token = Token(row,column,lexema[:-1], "integer")
-            token2 = Token(row,column,lexema[-1], sign)
-        else:
-            #TODO encontrar lexemas que no estan separados
-            for i in range(len(lexema),-1,-1):
-            # automaton for identify a complex id 
-            token = Token(row,column,"",token_id = "id")
-            for c in lexema:
-                if state == 0:
-                    if isalphabetic(c):
-                        token.add_lexema(c)
-                        state = 1
-                    else:
-                        state = -1
-                elif state == 1:
-                    if isalphabetic(c) or c == "_":
-                        token.add_lexema(c)
-                        continue
-                    else:
-                        state = -1
-                if state == -1:
-                    break
-        if state == -1:
-            print('>>> Error lexico (linea: %s, posicion: %s)' %(row, column))
-        else:
-            print(token)
-            if token2 != None:
-                print(token2)
-        
-        #Add the size of word and 1 cause of the space
-        column += len(lexema)+ 1
-    row += 1
+    while line != False:
+        line, row, col = solve(line, row, col)
+        is_begin_of_line = False
+        if line == False:
+            print(">>> Error lexico (linea: {0}, posicion: {1})".format(row, col))
+            error = True
+            break
+        if line == "":
+            break
+    if error:
+        break
