@@ -1,0 +1,40 @@
+PROCESA  S
+sale  S
+PROCESA  S-
+sale  S-
+PROCESA  A
+sale  A
+PROCESA  A-
+sale  A-
+PROCESA  B
+sale  B
+PROCESA  C
+sale  C
+PROCESA  D
+sale  D
+{'-': {'-'},
+ 'A': {'', 'cuatro', 'cinco', '-', 's'},
+ 'A-': {'', 'cuatro', 'cinco', 's', '-'},
+ 'B': {'', 'cuatro', 's'},
+ 'C': {'cinco'},
+ 'D': {'', 's'},
+ 'S': {'', '-', 'cinco', 'cuatro', 'dos',
+       's', 'uno'},
+ 'S-': {'', 'dos'},
+ 'seis': {'s'},
+ ('',): {''},
+ ('A', 'uno', 'B', 'C', 'S-'): {'', '-',
+                                'cinco',
+                                'cuatro',
+                                's',
+                                'uno'},
+ ('B', 'C', 'D', 'A-'): {'', 'cinco',
+                         'cuatro', 's'},
+ ('C', 'D', 'A-'): {'cinco'},
+ ('D', 'cuatro', 'C', 'tres'): {'',
+                                'cuatro',
+                                's'},
+ ('cinco', 'D', 'B'): {'cinco'},
+ ('cuatro', 'C', 'tres'): {'cuatro'},
+ ('dos', 'S-'): {'dos'},
+ ('uno', 'B', 'C', 'S-'): {'uno'}}
