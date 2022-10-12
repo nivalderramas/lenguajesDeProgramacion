@@ -1,3 +1,5 @@
+import sys
+from ast import Raise
 from lib2to3.pgen2.grammar import Grammar
 import copy
 import pprint
@@ -16,6 +18,11 @@ type_translation = {
   "integer": "_TKN_INT",
   "float": "_TKN_FLOAT",
   "id": "_TKN_ID",
+}
+type_translation_inverse = {
+  "_TKN_INT": "integer",
+  "_TKN_FLOAT": "float",
+  "_TKN_ID": "id",
 }
 
 regex = {
@@ -151,7 +158,7 @@ def try_regex(token, REGEX):
         return tkn
 
 
-def match(token):
+def match_regex(token):
     word = token[0]
     row = token[1]
     col = token[2]
@@ -193,7 +200,7 @@ def solve(line, row, col):
     while i > 0:
         left_part = line[:i]
         right_part = line[i:]
-        ans = match((left_part, row, col + 1 + delta))
+        ans = match_regex((left_part, row, col + 1 + delta))
         if ans != False:
             if ans.token_id != "comment":
                 tokens.append(ans)
@@ -268,21 +275,56 @@ grammar['OPERADOR'] = [
     (E,),
   ]
 grammar['TERM'] = [
-    ('_TKN_ID',),
+    ('_TKN_ID','ID_SUFFIX'), #Suffix might be "" for id, [] for array, () for function
     ('_TKN_INT',),
     ('_TKN_FLOAT',),
 ]
 grammar['SIGNO'] = [
     ('+',),
     ('-',),
-    ('*',),
-    ('/',),
+]
+grammar['ID_SUFFIX'] = [
+  ('ARRAY_LOC',),
+  ('FUNCTION_CALL',),
+  (E,),
+]
+grammar['ARRAY_LOC'] = [
+  ('[', 'OPERACION', ']'),
+  ('[', ']'),
+]
+grammar["FUNCTION_CALL"] = [
+  ('(', 'PARAMS', ')'),
+  ('(', ')'),
+]
+grammar['PARAMS'] = [
+  ('OPERACION', 'PARAMS_SUFFIX'),
+]
+grammar['PARAMS_SUFFIX'] = [
+  (',', 'PARAMS'),
+  (E,),
 ]
 
 
 primeros = {v:set() for v in grammar}
 siguientes = {}
 prediccion = {}
+
+def finish():
+  print("Analisis sintactico finalizado exitosamente")
+  sys.exit()
+
+def error(found, required):
+  required_str = ""
+  required = sorted(required)
+  for r in required:
+    if r in type_translation_inverse:
+      required_str += '"'+type_translation_inverse[r] + '", '
+    else:
+      required_str += '"'+r + '", '
+  required_str = required_str[:-2]
+  required_str += "."
+  print("Error de sintaxis: se encontro", found, "; se esperaba:",required_str )
+  sys.exit()
 
 # Rule is a list of symbols, meaning the right part of a rule
 def process_rule(rule):
@@ -376,8 +418,10 @@ def next_token():
   return
 
 #Decies if the symbol that is being readed is valid
-def match(waited_token):
-  print("Matcheando terminal:", waited_token, "con token:", tokens[0].token_id)
+def match_terminal(waited_token):
+  print(waited_token)
+  if(waited_token == END):
+    finish()
   token = tokens[0]
   token = token.lexema
   if tokens[0].token_id in type_translation:
@@ -387,35 +431,38 @@ def match(waited_token):
   else:
     token_id = ""
   if token == waited_token or token_id == waited_token:
-    print("se matcheo", token,"********"*5, waited_token)
     if waited_token != "":
       next_token()
   else:
-    message = "Syntax error, se esperarba " + waited_token + "pero se encontro " + token
-    raise SyntaxError (message)
-
+    error(token, waited_token)
 
 # Function that will match the appropriate rule for the given input
 def match_rule(non_terminal):
-  print("Matcheando regla", non_terminal)
-  token = tokens[0].lexema
-  if tokens[0].token_id in type_translation:
-    token_id = type_translation[tokens[0].token_id]
+  if(len(tokens) == 0):
+    token = END
+    token_id = END
   else:
-    token_id = ""
+    token = tokens[0].lexema if len(tokens)>0 else ""
+    if tokens[0].token_id in type_translation:
+      token_id = type_translation[tokens[0].token_id]
+    else:
+      token_id = ""
+  print("last token",token, "non terminal", non_terminal)
   matched = False
   for rule in grammar[non_terminal]:
     if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)]: #means that we must apply this rule
       matched = True
       for symbol in rule:
         if is_terminal(symbol, grammar):
-          print("probar matchear con:  ", non_terminal,'->', rule)
-          match(symbol)
+          match_terminal(symbol)
         else:
           match_rule(symbol)
+    if matched:
+      break
   if not matched:
-    message = "Error de sintaxis, token not matched " + token
-    raise SyntaxError (message)
+    error(token, primeros[non_terminal])
+  if len(tokens) == 0:
+    finish()
 
 
 for k in grammar:
@@ -432,10 +479,14 @@ for k in primeros:
 #primeros = newPrimeros
 get_nexts()
 get_pred()
-pp = pprint.PrettyPrinter(width=41, compact=True)
+#pp = pprint.PrettyPrinter(width=41, compact=True)
 #print("Prediction sets:")
+#pp.pprint(primeros)
+#print("SIGUIENTES*"*10)
+#pp.pprint(siguientes)
+#print("*"*10)
 #pp.pprint(prediccion)
 #Start matching
 token = tokens[0]
 match_rule(INICIAL)
-print("Analisis sintáctico finalizado exitosamente")
+finish()
