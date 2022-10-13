@@ -14,6 +14,8 @@ STRING_REGEX = (
 COMMENT_REGEX = r"//.*"
 INT_REGEX = r"[0-9]+"
 FLOAT_REGEX = r"\d+\.\d+"
+SYNTAX_LINE  = 99
+SYNTAX_COL  = 99
 
 type_translation = {
   "integer": "_TKN_INT",
@@ -26,6 +28,8 @@ type_translation_inverse = {
   "_TKN_FLOAT": "float",
   "_TKN_ID": "id",
   "_TKN_STRING": "str",
+  "$": "EOF",
+  '$': "EOF",
 }
 
 regex = {
@@ -428,13 +432,15 @@ primeros = {v:set() for v in grammar}
 siguientes = {}
 prediccion = {}
 
-def finish():
-  print("Analisis sintactico finalizado exitosamente")
+def finish(mess):
+  print("Analisis sintactico finalizado exitosamente",mess)
   sys.exit()
 
 def syntax_error(found, required):
   required_str = ""
   required = sorted(required)
+  if found == END:
+    found = "EOF"
   for r in required:
     if r in type_translation_inverse:
       required_str += '"'+type_translation_inverse[r] + '", '
@@ -442,7 +448,7 @@ def syntax_error(found, required):
       required_str += '"'+r + '", '
   required_str = required_str[:-2]
   required_str += "."
-  print("Error de sintaxis: se encontro", found, "; se esperaba:",required_str )
+  print('<'+str(SYNTAX_LINE)+':'+str(SYNTAX_COL)+'>','Error de sintaxis: se encontro', str(found)+'; se esperaba:',required_str )
   sys.exit()
 
 # Rule is a list of symbols, meaning the right part of a rule
@@ -540,8 +546,8 @@ def next_token():
 def match_terminal(waited_token):
   if waited_token == "":
     return
-  if(waited_token == END):
-    finish()
+  if waited_token == END and len(tokens) == 0:
+    finish("popo")
   if len(tokens) == 0:
     syntax_error(END,[waited_token])
   token = tokens[0]
@@ -557,7 +563,15 @@ def match_terminal(waited_token):
     if waited_token != "":
       print("matched **correctly**", waited_token, "con", token)
       next_token()
+      if len(tokens) != 0:
+        global SYNTAX_LINE
+        global SYNTAX_COL 
+        SYNTAX_LINE = tokens[0].row
+        SYNTAX_COL = tokens[0].column
   else:
+    if waited_token == END:
+      esperaba = [waited_token] + list(primeros['CODEBLOCK'])
+      syntax_error(token, esperaba)
     syntax_error(token, [waited_token])
 
 # Function that will match the appropriate rule for the given input
@@ -573,25 +587,27 @@ def match_rule(non_terminal):
     else:
       token_id = ""
   matched = False
-  print("mmmmmmmmmmmmanda a matchear", non_terminal)
+  #print("mmmmmmmmmmmmanda a matchear", non_terminal)
+  #print("Matchea no terminal",non_terminal)
   for rule in grammar[non_terminal]:
     cnt_match = 0
     #if token = END and prediccion
     if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)]: #means that we must apply this rule
       for symbol in rule:
         if is_terminal(symbol, grammar):
-          print("match terminal", token, "->", symbol)
+          #print("match terminal", token, "->", symbol)
           cnt_match += 1
           match_terminal(symbol)
         else:
-          print("MATCH NO TERMINAL",token, "->",  symbol)
+          #print("MATCH NO TERMINAL",token, "->",  symbol)
           cnt_match += 1
           match_rule(symbol)
     if cnt_match == len(rule):
       matched = True
       break
   if not matched:
-    syntax_error(token, primeros[non_terminal])
+    syntax_error(token+"asdas", primeros[non_terminal])
+  #print("----END termina de Matchear no terminal",non_terminal)
 
 
 
@@ -618,7 +634,9 @@ pp = pprint.PrettyPrinter(width=41, compact=True)
 #pp.pprint(prediccion)
 #Start matching
 token = tokens[0]
+SYNTAX_LINE = 1
+SYNTAX_COL = 1
 match_rule(INICIAL)
 if len(tokens) != 0:
   syntax_error(tokens[0].lexema, [END])
-finish()
+finish("ads")
