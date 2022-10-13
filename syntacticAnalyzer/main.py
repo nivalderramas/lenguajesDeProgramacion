@@ -1,3 +1,4 @@
+from multiprocessing.connection import wait
 import sys
 from ast import Raise
 from lib2to3.pgen2.grammar import Grammar
@@ -248,7 +249,7 @@ while True:
 ####################################### FINAL ANALISIS LEXICO ######################
 #for token in tokens:
 #  print(token.token_id)
-INICIAL = 'OPERACION'
+INICIAL = 'INICIAL'
 E = ""
 END  = "$"
 grammar = {
@@ -294,16 +295,63 @@ grammar['ARRAY_LOC'] = [
 ]
 grammar["FUNCTION_CALL"] = [
   ('(', 'PARAMS', ')'),
-  ('(', ')'),
 ]
 grammar['PARAMS'] = [
   ('OPERACION', 'PARAMS_SUFFIX'),
+  (E,),
 ]
 grammar['PARAMS_SUFFIX'] = [
   (',', 'PARAMS'),
   (E,),
 ]
 
+grammar[INICIAL] = [
+  ('Function','FUNC_DEF','MAIN_DEF'),
+  ('CODEBLOCK',),
+]
+
+grammar['FUNC_DEF'] = [
+  ('_TKN_ID','(','PARAMS_DEF',')','returns', 'FUNC_DEF_RETURNS'),
+  (E,),
+]
+grammar['FUNC_DEF_RETURNS'] = [
+  ('integer','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
+  ('float','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
+
+]
+grammar['PARAMS_DEF'] = [
+  ('float','_TKN_ID','PARAMS_SUFFIX_DEF'),
+  ('integer','_TKN_ID'),
+  (E,),
+]
+grammar['PARAMS_SUFFIX_DEF'] = [
+  (',','PARAMS_DEF'),
+  (E,),
+]
+grammar['MAIN_DEF'] = [
+  ('Main','(',')','returns','nothing','CODEBLOCK'),
+]
+grammar['CODEBLOCK'] = [
+  ('DECLARACION',),
+  ('ASIGNACION',),
+  #('PUT',),
+  #('FOR',),
+  #('WHILE',),
+  #('IF',),
+  #('BUILTINS',),
+]
+
+grammar['ID_DECLARATION_SUFFIX'] = [
+  ('ARRAY_LOC',),
+  (E,),
+]
+grammar['DECLARACION'] = [
+  ('float','_TKN_ID','ID_DECLARATION_SUFFIX'),
+  ('integer','_TKN_ID','ID_DECLARATION_SUFFIX'),
+]
+grammar['ASIGNACION'] = [
+  ('_TKN_ID','=', 'OPERACION'),
+]
 
 primeros = {v:set() for v in grammar}
 siguientes = {}
@@ -313,7 +361,7 @@ def finish():
   print("Analisis sintactico finalizado exitosamente")
   sys.exit()
 
-def error(found, required):
+def syntax_error(found, required):
   required_str = ""
   required = sorted(required)
   for r in required:
@@ -419,11 +467,15 @@ def next_token():
 
 #Decies if the symbol that is being readed is valid
 def match_terminal(waited_token):
-  print(waited_token)
+  if waited_token == "":
+    return
   if(waited_token == END):
     finish()
+  if len(tokens) == 0:
+    syntax_error(END,[waited_token])
   token = tokens[0]
   token = token.lexema
+  #print("waited",waited_token,"received",token)
   if tokens[0].token_id in type_translation:
     token_id = type_translation[tokens[0].token_id]
   #elif tokens[0].token_id in operators:
@@ -432,9 +484,10 @@ def match_terminal(waited_token):
     token_id = ""
   if token == waited_token or token_id == waited_token:
     if waited_token != "":
+      #print("matched **correctly**", waited_token)
       next_token()
   else:
-    error(token, waited_token)
+    syntax_error(token, [waited_token])
 
 # Function that will match the appropriate rule for the given input
 def match_rule(non_terminal):
@@ -447,22 +500,27 @@ def match_rule(non_terminal):
       token_id = type_translation[tokens[0].token_id]
     else:
       token_id = ""
-  print("last token",token, "non terminal", non_terminal)
   matched = False
+  #print("TOKEN",token)
   for rule in grammar[non_terminal]:
+    cnt_match = 0
+    #if token = END and prediccion
     if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)]: #means that we must apply this rule
-      matched = True
       for symbol in rule:
         if is_terminal(symbol, grammar):
+          #print("match terminal", token, "->", symbol)
+          cnt_match += 1
           match_terminal(symbol)
         else:
+          #print("MATCH NO TERMINAL",token, "->",  symbol)
+          cnt_match += 1
           match_rule(symbol)
-    if matched:
+    if cnt_match == len(rule):
+      matched = True
       break
   if not matched:
-    error(token, primeros[non_terminal])
-  if len(tokens) == 0:
-    finish()
+    syntax_error(token, primeros[non_terminal])
+
 
 
 for k in grammar:
@@ -479,7 +537,7 @@ for k in primeros:
 #primeros = newPrimeros
 get_nexts()
 get_pred()
-#pp = pprint.PrettyPrinter(width=41, compact=True)
+pp = pprint.PrettyPrinter(width=41, compact=True)
 #print("Prediction sets:")
 #pp.pprint(primeros)
 #print("SIGUIENTES*"*10)
