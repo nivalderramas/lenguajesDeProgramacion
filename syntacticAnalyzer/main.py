@@ -19,11 +19,13 @@ type_translation = {
   "integer": "_TKN_INT",
   "float": "_TKN_FLOAT",
   "id": "_TKN_ID",
+  "str": "_TKN_STRING",
 }
 type_translation_inverse = {
   "_TKN_INT": "integer",
   "_TKN_FLOAT": "float",
   "_TKN_ID": "id",
+  "_TKN_STRING": "str",
 }
 
 regex = {
@@ -263,6 +265,10 @@ grammar = {
 
 grammar = {}
 #arithmetical grammar
+grammar[INICIAL] = [
+  ('Function','FUNC_DEF','MAIN_DEF',END),
+  ('CODEBLOCK',END),
+]
 grammar['OPERACION'] = [
     ('(', 'OPERACION', ')', 'OPERADOR'),
     ('SIGNO', 'OPERACION'),
@@ -273,12 +279,17 @@ grammar['OPERADOR'] = [
     ('+', 'OPERACION'),
     ('-', 'OPERACION'),
     ('/', 'OPERACION'),
+    ('%', 'OPERACION'),
     (E,),
   ]
 grammar['TERM'] = [
     ('_TKN_ID','ID_SUFFIX'), #Suffix might be "" for id, [] for array, () for function
     ('_TKN_INT',),
     ('_TKN_FLOAT',),
+]
+grammar['TERM_NEW_ARRAY'] = [
+  ('_TKN_INT',),
+  ('?',),
 ]
 grammar['SIGNO'] = [
     ('+',),
@@ -291,7 +302,6 @@ grammar['ID_SUFFIX'] = [
 ]
 grammar['ARRAY_LOC'] = [
   ('[', 'OPERACION', ']'),
-  ('[', ']'),
 ]
 grammar["FUNCTION_CALL"] = [
   ('(', 'PARAMS', ')'),
@@ -305,18 +315,14 @@ grammar['PARAMS_SUFFIX'] = [
   (E,),
 ]
 
-grammar[INICIAL] = [
-  ('Function','FUNC_DEF','MAIN_DEF'),
-  ('CODEBLOCK',),
-]
-
 grammar['FUNC_DEF'] = [
-  ('_TKN_ID','(','PARAMS_DEF',')','returns', 'FUNC_DEF_RETURNS'),
+  ('_TKN_ID','(','PARAMS_DEF',')','returns', 'FUNC_DEF_RETURNS', 'CODEBLOCK'),
   (E,),
 ]
 grammar['FUNC_DEF_RETURNS'] = [
   ('integer','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
   ('float','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
+  ('nothing',),
 
 ]
 grammar['PARAMS_DEF'] = [
@@ -329,28 +335,93 @@ grammar['PARAMS_SUFFIX_DEF'] = [
   (E,),
 ]
 grammar['MAIN_DEF'] = [
-  ('Main','(',')','returns','nothing','CODEBLOCK'),
+  ('Function','Main','(',')','returns','nothing','CODEBLOCK'),
 ]
 grammar['CODEBLOCK'] = [
-  ('DECLARACION',),
-  ('ASIGNACION',),
-  #('PUT',),
-  #('FOR',),
-  #('WHILE',),
-  #('IF',),
+  ('DECLARACION_TYPE','NON_FIRST_CODEBLOCK'),
+  ('ASIGNACION','NON_FIRST_CODEBLOCK'),
+  ('Put','PUT_SUFFIX','to', 'output','NON_FIRST_CODEBLOCK'),
+  ('FOR','NON_FIRST_CODEBLOCK'),
+  ('WHILE','NON_FIRST_CODEBLOCK'),
+  ('IF','NON_FIRST_CODEBLOCK'),
   #('BUILTINS',),
 ]
-
-grammar['ID_DECLARATION_SUFFIX'] = [
-  ('ARRAY_LOC',),
+grammar['NON_FIRST_CODEBLOCK'] = [
+  ('DECLARACION_TYPE','NON_FIRST_CODEBLOCK'),
+  ('ASIGNACION','NON_FIRST_CODEBLOCK'),
+  ('Put','PUT_SUFFIX','to', 'output','NON_FIRST_CODEBLOCK'),
+  ('FOR','NON_FIRST_CODEBLOCK'),
+  ('WHILE','NON_FIRST_CODEBLOCK'),
+  ('IF','NON_FIRST_CODEBLOCK'),
+  #('BUILTINS',),
   (E,),
 ]
+grammar['FOR'] = [
+  ('for','ASIGNACION',';','LOGIC_OPERACION',';','ASIGNACION','CODEBLOCK'),
+]
+grammar['WHILE'] = [
+  ('while','LOGIC_OPERACION','CODEBLOCK'),
+]
+grammar['IF'] = [
+  ('if','LOGIC_OPERACION','CODEBLOCK','ELSEIF','ELSE'),
+]
+grammar['ELSEIF'] = [
+  ('elseif','LOGIC_OPERACION','CODEBLOCK','ELSEIF'),
+  (E,),
+]
+grammar['ELSE'] = [
+  ('else','CODEBLOCK'),
+  (E,),
+]
+grammar['PUT_SUFFIX'] = [
+  ('_TKN_ID',), #TODO array
+  ('_TKN_STRING',),
+]
+grammar['DECLARACION_TYPE'] = [
+  ('float','DECLARACION',),
+  ('integer','DECLARACION'),
+]
 grammar['DECLARACION'] = [
-  ('float','_TKN_ID','ID_DECLARATION_SUFFIX'),
-  ('integer','_TKN_ID','ID_DECLARATION_SUFFIX'),
+  ('array','(','TERM_NEW_ARRAY',')','_TKN_ID'),
+  ('_TKN_ID',),
 ]
 grammar['ASIGNACION'] = [
-  ('_TKN_ID','=', 'OPERACION'),
+  ('_TKN_ID','=', 'ASIGNACION_SUFFIX'),
+]
+grammar['ASIGNACION_SUFFIX'] = [
+  ('OPERACION',),
+  ('Get','next','input'),
+]
+
+grammar['LOGIC_ANIDADOR'] = [
+  ('and','LOGIC_OPERACION'),
+  ('or','LOGIC_OPERACION'),
+  (E,),
+]
+grammar['LOGIC_OPERACION'] = [
+  ('OPERACION','LOGIC_OPERADOR','LOGIC_ANIDADOR'),
+  ('not','(','OPERACION','LOGIC_OPERADOR',')','LOGIC_ANIDADOR',),
+]
+grammar['LOGIC_OPERADOR'] = [
+  ('==','OPERACION','LOGIC_OPERADOR_2'),
+  ('!=','OPERACION','LOGIC_OPERADOR_2'),
+  ('==','OPERACION','LOGIC_OPERADOR_2'),
+  ('<' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('>' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('?' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('>=','OPERACION','LOGIC_OPERADOR_2'),
+  ('<=','OPERACION','LOGIC_OPERADOR_2'),
+]
+grammar['LOGIC_OPERADOR_2'] = [
+  ('==','OPERACION','LOGIC_OPERADOR_2'),
+  ('!=','OPERACION','LOGIC_OPERADOR_2'),
+  ('==','OPERACION','LOGIC_OPERADOR_2'),
+  ('<' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('>' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('?' ,'OPERACION','LOGIC_OPERADOR_2'),
+  ('>=','OPERACION','LOGIC_OPERADOR_2'),
+  ('<=','OPERACION','LOGIC_OPERADOR_2'),
+  (E,),
 ]
 
 primeros = {v:set() for v in grammar}
@@ -475,16 +546,16 @@ def match_terminal(waited_token):
     syntax_error(END,[waited_token])
   token = tokens[0]
   token = token.lexema
-  #print("waited",waited_token,"received",token)
   if tokens[0].token_id in type_translation:
     token_id = type_translation[tokens[0].token_id]
   #elif tokens[0].token_id in operators:
   #  token_id = operators[tokens[0].token_id]
   else:
     token_id = ""
+  #print("waited",waited_token,"received",token,"token_id",token_id)
   if token == waited_token or token_id == waited_token:
     if waited_token != "":
-      #print("matched **correctly**", waited_token)
+      print("matched **correctly**", waited_token, "con", token)
       next_token()
   else:
     syntax_error(token, [waited_token])
@@ -496,23 +567,24 @@ def match_rule(non_terminal):
     token_id = END
   else:
     token = tokens[0].lexema if len(tokens)>0 else ""
+    #print("id",tokens[0].token_id)
     if tokens[0].token_id in type_translation:
       token_id = type_translation[tokens[0].token_id]
     else:
       token_id = ""
   matched = False
-  #print("TOKEN",token)
+  print("mmmmmmmmmmmmanda a matchear", non_terminal)
   for rule in grammar[non_terminal]:
     cnt_match = 0
     #if token = END and prediccion
     if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)]: #means that we must apply this rule
       for symbol in rule:
         if is_terminal(symbol, grammar):
-          #print("match terminal", token, "->", symbol)
+          print("match terminal", token, "->", symbol)
           cnt_match += 1
           match_terminal(symbol)
         else:
-          #print("MATCH NO TERMINAL",token, "->",  symbol)
+          print("MATCH NO TERMINAL",token, "->",  symbol)
           cnt_match += 1
           match_rule(symbol)
     if cnt_match == len(rule):
@@ -547,4 +619,6 @@ pp = pprint.PrettyPrinter(width=41, compact=True)
 #Start matching
 token = tokens[0]
 match_rule(INICIAL)
+if len(tokens) != 0:
+  syntax_error(tokens[0].lexema, [END])
 finish()
