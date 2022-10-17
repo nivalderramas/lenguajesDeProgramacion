@@ -329,8 +329,12 @@ grammar['PARAMS_DEF'] = [
   ('integer','_TKN_ID','PARAMS_SUFFIX_DEF'),
   (E,),
 ]
+grammar['PARAMS_DEF_NON_EMPTY'] = [
+  ('float','_TKN_ID','PARAMS_SUFFIX_DEF'),
+  ('integer','_TKN_ID','PARAMS_SUFFIX_DEF'),
+]
 grammar['PARAMS_SUFFIX_DEF'] = [
-  (',','PARAMS_DEF'),
+  (',','PARAMS_DEF_NON_EMPTY',),
   (E,),
 ]
 grammar['OPERACION'] = [
@@ -429,11 +433,11 @@ grammar['WHILE'] = [
   ('while','LOGIC_OPERACION','CODEBLOCK'),
 ]
 grammar['IF'] = [
-  ('if','LOGIC_OPERACION','CODEBLOCK','ELSEIF','ELSE'),
-  ('if','(','LOGIC_OPERACION',')','CODEBLOCK','ELSEIF','ELSE'),
+  ('if','PRE_LOPERACION','CODEBLOCK','ELSEIF','ELSE'),
+  ('if','(','PRE_LOPERACION',')','CODEBLOCK','ELSEIF','ELSE'),
 ]
 grammar['ELSEIF'] = [
-  ('elseif','LOGIC_OPERACION','CODEBLOCK','ELSEIF'),
+  ('elseif','PRE_LOPERACION','CODEBLOCK','ELSEIF'),
   (E,),
 ]
 grammar['ELSE'] = [
@@ -479,6 +483,36 @@ grammar['LOGIC_OPERACION'] = [
   ('OPERACION','LOGIC_OPERADOR','LOGIC_ANIDADOR'),
   ('not','(','OPERACION','LOGIC_OPERADOR',')','LOGIC_ANIDADOR',),
 ]
+grammar['PRE_LOPERACION'] = [
+  ('not','(','LOPERACION',')'),
+  ('LOPERACION',),
+]
+grammar['LOPERACION'] = [
+  ('(','PRE_LOPERACION',')','LOPERADOR','LANIDADOR'),
+  ('SIGNO','PRE_LOPERACION','LANIDADOR'),
+  ('TERM','LOPERADOR','LANIDADOR'),
+]
+grammar['LANIDADOR'] = [
+  ('and','PRE_LOPERACION'),
+  ('or','PRE_LOPERACION'),
+  (E,),
+]
+grammar['LOPERADOR'] = [
+  ('==','PRE_LOPERACION'),
+  ('!=','PRE_LOPERACION'),
+  ('==','PRE_LOPERACION'),
+  ('<' ,'PRE_LOPERACION'),
+  ('>' ,'PRE_LOPERACION'),
+  ('?' ,'PRE_LOPERACION'),
+  ('>=','PRE_LOPERACION'),
+  ('<=','PRE_LOPERACION'),
+  ('*', 'PRE_LOPERACION'),
+  ('+', 'PRE_LOPERACION'),
+  ('-', 'PRE_LOPERACION'),
+  ('/', 'PRE_LOPERACION'),
+  ('%', 'PRE_LOPERACION'),
+  (E,),
+]
 grammar['LOGIC_OPERADOR'] = [
   ('==','OPERACION','LOGIC_OPERADOR_2'),
   ('!=','OPERACION','LOGIC_OPERADOR_2'),
@@ -517,8 +551,8 @@ def syntax_error(found, required):
   aux_dict = {}
   for item in required:
     if item in operators:
-      aux_list.append('zzzzzzz'+operators[item])
-      aux_dict['zzzzzzz'+operators[item]] = item
+      aux_list.append("tkn_"+operators[item])
+      aux_dict["tkn_"+operators[item]] = item
     elif item in type_translation_inverse:
       aux_list.append(type_translation_inverse[item])
       aux_dict[type_translation_inverse[item]] = item

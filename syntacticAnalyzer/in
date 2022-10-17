@@ -1,2 +1,4 @@
-Function new_array(integer s) returns integer array(?) userNums
-   userNums.size = Get next input
+if x == (a*3)
+   Put "EOF" to output
+else x != (a*3)
+   Put "continue\n" to output
