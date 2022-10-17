@@ -1,10 +1,5 @@
-from multiprocessing.connection import wait
 import sys
-from ast import Raise
-from lib2to3.pgen2.grammar import Grammar
 import copy
-import pprint
-from utils import *
 import re
 tokens = []
 VARS_REGEX = "(([a-z]|[A-Z])+(_|[0-9])*)+"
@@ -14,8 +9,6 @@ STRING_REGEX = (
 COMMENT_REGEX = r"//.*"
 INT_REGEX = r"[0-9]+"
 FLOAT_REGEX = r"\d+\.\d+"
-SYNTAX_LINE  = 99
-SYNTAX_COL  = 99
 
 type_translation = {
   "integer": "_TKN_INT",
@@ -24,10 +17,10 @@ type_translation = {
   "str": "_TKN_STRING",
 }
 type_translation_inverse = {
-  "_TKN_INT": "integer",
-  "_TKN_FLOAT": "float",
+  "_TKN_INT": "integer_value",
+  "_TKN_FLOAT": "float_value",
   "_TKN_ID": "id",
-  "_TKN_STRING": "str",
+  "_TKN_STRING": "string_literal",
   "$": "EOF",
   '$': "EOF",
 }
@@ -63,39 +56,62 @@ operators = {
 }
 
 reserved_words = {
-    "Get",
-    "next",
-    "input",
-    "Put",
-    "to",
-    "output",
-    "if",
-    "elseif",
-    "else",
-    "while",
-    "for",
-    "integer",
-    "float",
-    "array",
-    "Function",
-    "returns",
-    "SquareRoot",
-    "RaiseToPower",
-    "AbsoluteValue",
-    "RandomNumber",
-    "SeedRandomNumbers",
-    "with",
-    "decimal",
-    "places",
-    "size",
-    "Main",
-    "or",
-    "and",
-    "nothing",
-    "not",
-    "evaluates",
+    "Get",#
+    "next",#
+    "input",#
+    "Put",#
+    "to",#
+    "output",#
+    "if",#
+    "elseif",#
+    "else",#
+    "while",#
+    "for",#
+    "integer",#
+    "float",#
+    "array",#
+    "Function",#
+    "returns",#
+    "size",#
+    "Main",#
+    "or",#
+    "and",#
+    "nothing",#
+    "not",#
+    "SeedRandomNumbers",#
+    "AbsoluteValue",#
+    "SquareRoot",#
+    "RaiseToPower",#
+    "RandomNumber",#
+    "with",#
+    "decimal",#
+    "places",#
 }
 
+#function that insert element in the set of the given key and creates the set if it doesn't exist
+def insert_in_set(dictionary, key, element):
+  if key in dictionary:
+    dictionary[key].add(element)
+  else:
+    dictionary[key] = {element}
+  
+#function that updates a set if the key exists and creates it if it doesn't
+def update_set(dictionary, key, element):
+  if key in dictionary:
+    dictionary[key].update(element)
+  else:
+    dictionary[key] = element
+
+def is_terminal(symbol, grammar):
+  return symbol not in grammar
+
+
+def is_contained(A, B, grammar):
+  # Check if A is contained in B
+  for rule in grammar[B]:
+    if A in rule:
+      return True
+  return False
 class Token:
     def __init__(self, row, column, lexema="", token_id=None):
         self.row = row
@@ -226,6 +242,8 @@ row = 0
 col = 0
 is_begin_of_line = True
 error = False
+columnEND = -1
+rowEND = -1
 while True:
     line = ""
     try:
@@ -236,6 +254,8 @@ while True:
         if line == "":
             continue
     except EOFError:
+        columnEND = 1
+        rowEND = row + 1
         break
     while line != False:
         line, row, col = solve(line, row, col)
@@ -270,8 +290,48 @@ grammar = {
 grammar = {}
 #arithmetical grammar
 grammar[INICIAL] = [
-  ('Function','FUNC_DEF','MAIN_DEF',END),
+  ('FUNCTION_INICIAL',END),
   ('CODEBLOCK',END),
+]
+grammar['FUNCTION_INICIAL'] = [
+  #('Function','FUNC_DEF','FUNCTION_INICIAL','MAIN_DEF',END),
+  ('Function','INICIAL_MAIN_VS_ID'),
+]
+grammar['FUNCTION_NO_INICIAL'] = [
+  #('Function','FUNC_DEF','FUNCTION_INICIAL','MAIN_DEF',END),
+  ('Function','MAIN_VS_ID'),
+]
+grammar['INICIAL_MAIN_VS_ID'] = [
+  ('_TKN_ID','FUNC_DEF'),
+]
+grammar['MAIN_VS_ID'] = [
+  ('_TKN_ID','FUNC_DEF'),
+  ('MAIN_DEF',),
+]
+grammar['FUNC_DEF'] = [
+  ('(','PARAMS_DEF',')','returns', 'FUNC_DEF_RETURNS', 'CODEBLOCK','Function','MAIN_VS_ID'),
+]
+grammar['MAIN_DEF'] = [
+  ('Main','(',')','returns','nothing','CODEBLOCK'),
+]
+grammar['FUNC_DEF_RETURNS'] = [
+  ('integer','FUNC_DEF_RETURNS_SUFFIX'),
+  ('float','FUNC_DEF_RETURNS_SUFFIX'),
+  ('nothing',),
+]
+grammar['FUNC_DEF_RETURNS_SUFFIX'] = [
+  ('array','(','TERM_NEW_ARRAY',')','_TKN_ID'),
+  ('_TKN_ID',),
+  (E,),
+]
+grammar['PARAMS_DEF'] = [
+  ('float','_TKN_ID','PARAMS_SUFFIX_DEF'),
+  ('integer','_TKN_ID','PARAMS_SUFFIX_DEF'),
+  (E,),
+]
+grammar['PARAMS_SUFFIX_DEF'] = [
+  (',','PARAMS_DEF'),
+  (E,),
 ]
 grammar['OPERACION'] = [
     ('(', 'OPERACION', ')', 'OPERADOR'),
@@ -287,9 +347,13 @@ grammar['OPERADOR'] = [
     (E,),
   ]
 grammar['TERM'] = [
-    ('_TKN_ID','ID_SUFFIX'), #Suffix might be "" for id, [] for array, () for function
     ('_TKN_INT',),
+    ('_TKN_ID','ID_SUFFIX'), #Suffix might be "" for id, [] for array, () for function
     ('_TKN_FLOAT',),
+    ('RandomNumber','(','OPERACION', ',' ,'OPERACION',')'),
+    ('AbsoluteValue','(','OPERACION',')'),
+    ('SquareRoot','(','OPERACION',')'),
+    ('RaiseToPower','(','OPERACION', ',' ,'OPERACION',')'),
 ]
 grammar['TERM_NEW_ARRAY'] = [
   ('_TKN_INT',),
@@ -302,6 +366,7 @@ grammar['SIGNO'] = [
 grammar['ID_SUFFIX'] = [
   ('ARRAY_LOC',),
   ('FUNCTION_CALL',),
+  ('.','size'),
   (E,),
 ]
 grammar['ARRAY_LOC'] = [
@@ -319,44 +384,41 @@ grammar['PARAMS_SUFFIX'] = [
   (E,),
 ]
 
-grammar['FUNC_DEF'] = [
-  ('_TKN_ID','(','PARAMS_DEF',')','returns', 'FUNC_DEF_RETURNS', 'CODEBLOCK'),
+grammar['ID_PREFIJO_CODEBLOCK'] = [
+  ('_TKN_ID','ID_SUFIJO_CODEBLOCK'),
+]
+grammar['ID_SUFIJO_CODEBLOCK'] = [
+  ('=','OPERACION_VS_INPUT'),
+  ('[','OPERACION',']','=','OPERACION_VS_INPUT'),
+  ('(','PARAMS',')'),
+  ('.','size','=','OPERACION_VS_INPUT'),
+]
+grammar['OPERACION_VS_INPUT'] = [
+  ('Get','next','input'),
+  ('OPERACION',),
+]
+grammar['PUT_PRECISION']=[
+  ('with','OPERACION','decimal','places'),
   (E,),
-]
-grammar['FUNC_DEF_RETURNS'] = [
-  ('integer','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
-  ('float','_TKN_ID','CODEBLOCK', 'FUNC_DEF'),
-  ('nothing',),
-
-]
-grammar['PARAMS_DEF'] = [
-  ('float','_TKN_ID','PARAMS_SUFFIX_DEF'),
-  ('integer','_TKN_ID'),
-  (E,),
-]
-grammar['PARAMS_SUFFIX_DEF'] = [
-  (',','PARAMS_DEF'),
-  (E,),
-]
-grammar['MAIN_DEF'] = [
-  ('Function','Main','(',')','returns','nothing','CODEBLOCK'),
 ]
 grammar['CODEBLOCK'] = [
   ('DECLARACION_TYPE','NON_FIRST_CODEBLOCK'),
-  ('ASIGNACION','NON_FIRST_CODEBLOCK'),
-  ('Put','PUT_SUFFIX','to', 'output','NON_FIRST_CODEBLOCK'),
+  ('ID_PREFIJO_CODEBLOCK','NON_FIRST_CODEBLOCK'),
+  ('Put','PUT_SUFFIX','to', 'output','PUT_PRECISION','NON_FIRST_CODEBLOCK'),
   ('FOR','NON_FIRST_CODEBLOCK'),
   ('WHILE','NON_FIRST_CODEBLOCK'),
   ('IF','NON_FIRST_CODEBLOCK'),
+  ('SeedRandomNumbers','(','OPERACION',')','NON_FIRST_CODEBLOCK'),
   #('BUILTINS',),
 ]
 grammar['NON_FIRST_CODEBLOCK'] = [
   ('DECLARACION_TYPE','NON_FIRST_CODEBLOCK'),
-  ('ASIGNACION','NON_FIRST_CODEBLOCK'),
-  ('Put','PUT_SUFFIX','to', 'output','NON_FIRST_CODEBLOCK'),
+  ('ID_PREFIJO_CODEBLOCK','NON_FIRST_CODEBLOCK'),
+  ('Put','PUT_SUFFIX','to', 'output','PUT_PRECISION','NON_FIRST_CODEBLOCK'),
   ('FOR','NON_FIRST_CODEBLOCK'),
   ('WHILE','NON_FIRST_CODEBLOCK'),
   ('IF','NON_FIRST_CODEBLOCK'),
+  ('SeedRandomNumbers','(','OPERACION',')','NON_FIRST_CODEBLOCK'),
   #('BUILTINS',),
   (E,),
 ]
@@ -368,6 +430,7 @@ grammar['WHILE'] = [
 ]
 grammar['IF'] = [
   ('if','LOGIC_OPERACION','CODEBLOCK','ELSEIF','ELSE'),
+  ('if','(','LOGIC_OPERACION',')','CODEBLOCK','ELSEIF','ELSE'),
 ]
 grammar['ELSEIF'] = [
   ('elseif','LOGIC_OPERACION','CODEBLOCK','ELSEIF'),
@@ -378,9 +441,14 @@ grammar['ELSE'] = [
   (E,),
 ]
 grammar['PUT_SUFFIX'] = [
-  ('_TKN_ID',), #TODO array
+  #('_TKN_ID',('PUT_SUFFIX_ID_ARRAY')), #TODO array
   ('_TKN_STRING',),
+  ('OPERACION',),
 ]
+grammar['PUT_SUFFIX_ID_ARRAY'] = [
+  ('[','OPERACION',']'),
+  (E,),
+  ]
 grammar['DECLARACION_TYPE'] = [
   ('float','DECLARACION',),
   ('integer','DECLARACION'),
@@ -390,7 +458,12 @@ grammar['DECLARACION'] = [
   ('_TKN_ID',),
 ]
 grammar['ASIGNACION'] = [
-  ('_TKN_ID','=', 'ASIGNACION_SUFFIX'),
+  ('_TKN_ID','ASIGNACION_ID_SUFIJO'), #Todo array
+]
+grammar['ASIGNACION_ID_SUFIJO'] = [
+  ('[','OPERACION',']','=','ASIGNACION_SUFFIX'),
+  ('.','size','=','ASIGNACION_SUFFIX'),
+  ('=','ASIGNACION_SUFFIX'),
 ]
 grammar['ASIGNACION_SUFFIX'] = [
   ('OPERACION',),
@@ -432,15 +505,33 @@ primeros = {v:set() for v in grammar}
 siguientes = {}
 prediccion = {}
 
-def finish(mess):
-  print("Analisis sintactico finalizado exitosamente",mess)
+def finish():
+  print("El analisis sintactico ha finalizado exitosamente.")
   sys.exit()
 
 def syntax_error(found, required):
+  required = required.difference({E})
   required_str = ""
-  required = sorted(required)
+  required = list(required)
+  aux_list = []
+  aux_dict = {}
+  for item in required:
+    if item in operators:
+      aux_list.append('zzzzzzz'+operators[item])
+      aux_dict['zzzzzzz'+operators[item]] = item
+    elif item in type_translation_inverse:
+      aux_list.append(type_translation_inverse[item])
+      aux_dict[type_translation_inverse[item]] = item
+    else:
+      aux_list.append(item.lower())
+      aux_dict[item.lower()] = item
+  #print("aux",aux_list)
+  aux_list.sort()
+  required = []
+  for item in aux_list:
+    required.append(aux_dict[item])
   if found == END:
-    found = "EOF"
+    found = "final de archivo"
   for r in required:
     if r in type_translation_inverse:
       required_str += '"'+type_translation_inverse[r] + '", '
@@ -448,7 +539,10 @@ def syntax_error(found, required):
       required_str += '"'+r + '", '
   required_str = required_str[:-2]
   required_str += "."
-  print('<'+str(SYNTAX_LINE)+':'+str(SYNTAX_COL)+'>','Error de sintaxis: se encontro', str(found)+'; se esperaba:',required_str )
+  if len(tokens) != 0:
+    print('<'+str(tokens[0].row)+':'+str(tokens[0].column)+'>','Error sintactico: se encontro: "'+str(found)+'"; se esperaba:',required_str )
+  else:
+    print('<'+str(rowEND)+':'+str(columnEND)+'> Error sintactico: se encontro '+str(found)+'; se esperaba:',required_str )
   sys.exit()
 
 # Rule is a list of symbols, meaning the right part of a rule
@@ -542,74 +636,68 @@ def next_token():
   tokens.pop(0)
   return
 
-#Decies if the symbol that is being readed is valid
-def match_terminal(waited_token):
-  if waited_token == "":
-    return
-  if waited_token == END and len(tokens) == 0:
-    finish("popo")
-  if len(tokens) == 0:
-    syntax_error(END,[waited_token])
-  token = tokens[0]
-  token = token.lexema
-  if tokens[0].token_id in type_translation:
-    token_id = type_translation[tokens[0].token_id]
-  #elif tokens[0].token_id in operators:
-  #  token_id = operators[tokens[0].token_id]
-  else:
-    token_id = ""
-  #print("waited",waited_token,"received",token,"token_id",token_id)
-  if token == waited_token or token_id == waited_token:
-    if waited_token != "":
-      print("matched **correctly**", waited_token, "con", token)
-      next_token()
-      if len(tokens) != 0:
-        global SYNTAX_LINE
-        global SYNTAX_COL 
-        SYNTAX_LINE = tokens[0].row
-        SYNTAX_COL = tokens[0].column
-  else:
-    if waited_token == END:
-      esperaba = [waited_token] + list(primeros['CODEBLOCK'])
-      syntax_error(token, esperaba)
-    syntax_error(token, [waited_token])
-
-# Function that will match the appropriate rule for the given input
-def match_rule(non_terminal):
+def get_token():
   if(len(tokens) == 0):
     token = END
     token_id = END
   else:
     token = tokens[0].lexema if len(tokens)>0 else ""
-    #print("id",tokens[0].token_id)
     if tokens[0].token_id in type_translation:
       token_id = type_translation[tokens[0].token_id]
+    elif token in operators:
+      token_id = operators[token]
     else:
-      token_id = ""
+      token_id = token
+  return token, token_id
+
+
+#Function that matches the whole grammar and raise the error if it is not valid with the corresponding expected values
+def match_terminal2(token,token_id,waited_token, expected_tokens = set()):
+  #TODO END of file
+  #print("token",token,"token_id",token_id,"se esperaba",waited_token,"y ademas",expected_tokens)
+  error = False
+  if token == waited_token or token_id == waited_token:
+    #print("matched **correctly**", waited_token, "con", token)
+    next_token()
+    return False, set()
+  else:
+    return True, expected_tokens.union({waited_token})
+
+def match_program(non_terminal, expected_tokens):
+  token, token_id = get_token()
+  error = False
   matched = False
-  #print("mmmmmmmmmmmmanda a matchear", non_terminal)
-  #print("Matchea no terminal",non_terminal)
+  #Find the rule to apply
+  #print("Matching non terminal", non_terminal,"con TOKEN",token,token_id,"expected",expected_tokens)
   for rule in grammar[non_terminal]:
-    cnt_match = 0
-    #if token = END and prediccion
-    if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)]: #means that we must apply this rule
+    if token in prediccion[(non_terminal, rule)] or token_id in prediccion[(non_terminal, rule)] or rule==(E,):
+      matched = True
+      if rule == (E,):
+        #Si matchea con E, entonces agregamos lo que se podía esperar y retornamos para seguir el proceso
+        expected_tokens = expected_tokens.union(primeros[non_terminal]).difference({E})
+        #print("matchea con E",expected_tokens, "-----------",primeros[non_terminal])
+        return False, expected_tokens
       for symbol in rule:
         if is_terminal(symbol, grammar):
-          #print("match terminal", token, "->", symbol)
-          cnt_match += 1
-          match_terminal(symbol)
+          #print("non terminal",non_terminal,"llama a terminal",symbol)
+          error, expected_tokens = match_terminal2(token,token_id,symbol, expected_tokens)
+          token, token_id = get_token()
+          #print("se devuelve el terminal",symbol,"expected",expected_tokens," sigo en ",non_terminal)
         else:
-          #print("MATCH NO TERMINAL",token, "->",  symbol)
-          cnt_match += 1
-          match_rule(symbol)
-    if cnt_match == len(rule):
-      matched = True
+          #print("non terminal",non_terminal,"llama a non terminal",symbol)
+          error, expected_tokens = match_program(symbol,expected_tokens)
+          token, token_id = get_token()
+          #print("se devuelve",symbol,"con error",error,"expected_tokens",expected_tokens)
+        if error:
+          return error, expected_tokens
       break
   if not matched:
-    syntax_error(token+"asdas", primeros[non_terminal])
-  #print("----END termina de Matchear no terminal",non_terminal)
+    #print("no matchea con nada",non_terminal,expected_tokens)
+    error = True
+    expected_tokens = expected_tokens.union(primeros[non_terminal])
+  return error, expected_tokens
 
-
+  
 
 for k in grammar:
   primeros[k] = set()
@@ -622,21 +710,15 @@ newPrimeros = {}
 for k in primeros:
   if k in grammar:
     newPrimeros[k] = primeros[k]
-#primeros = newPrimeros
 get_nexts()
 get_pred()
-pp = pprint.PrettyPrinter(width=41, compact=True)
-#print("Prediction sets:")
-#pp.pprint(primeros)
-#print("SIGUIENTES*"*10)
-#pp.pprint(siguientes)
-#print("*"*10)
-#pp.pprint(prediccion)
-#Start matching
-token = tokens[0]
-SYNTAX_LINE = 1
-SYNTAX_COL = 1
-match_rule(INICIAL)
-if len(tokens) != 0:
-  syntax_error(tokens[0].lexema, [END])
-finish("ads")
+if len(tokens) == 0:
+  finish()
+error, waited_tokens = match_program(INICIAL,set())
+if error:
+  if len(tokens) == 0:
+    syntax_error(END, waited_tokens)
+  else:
+    syntax_error(tokens[0].lexema, waited_tokens)
+else:
+  finish()

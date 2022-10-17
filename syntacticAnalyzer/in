@@ -1,1 +1,2 @@
-3 * 4
+Function new_array(integer s) returns integer array(?) userNums
+   userNums.size = Get next input
