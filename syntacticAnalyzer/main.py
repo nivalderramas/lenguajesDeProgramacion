@@ -427,10 +427,10 @@ grammar['NON_FIRST_CODEBLOCK'] = [
   (E,),
 ]
 grammar['FOR'] = [
-  ('for','ASIGNACION',';','LOGIC_OPERACION',';','ASIGNACION','CODEBLOCK'),
+  ('for','ASIGNACION',';','PRE_LOPERACION',';','ASIGNACION','CODEBLOCK'),
 ]
 grammar['WHILE'] = [
-  ('while','LOGIC_OPERACION','CODEBLOCK'),
+  ('while','PRE_LOPERACION','CODEBLOCK'),
 ]
 grammar['IF'] = [
   ('if','PRE_LOPERACION','CODEBLOCK','ELSEIF','ELSE'),
@@ -473,16 +473,6 @@ grammar['ASIGNACION_SUFFIX'] = [
   ('OPERACION',),
   ('Get','next','input'),
 ]
-
-grammar['LOGIC_ANIDADOR'] = [
-  ('and','LOGIC_OPERACION'),
-  ('or','LOGIC_OPERACION'),
-  (E,),
-]
-grammar['LOGIC_OPERACION'] = [
-  ('OPERACION','LOGIC_OPERADOR','LOGIC_ANIDADOR'),
-  ('not','(','OPERACION','LOGIC_OPERADOR',')','LOGIC_ANIDADOR',),
-]
 grammar['PRE_LOPERACION'] = [
   ('not','(','LOPERACION',')'),
   ('LOPERACION',),
@@ -511,27 +501,6 @@ grammar['LOPERADOR'] = [
   ('-', 'PRE_LOPERACION'),
   ('/', 'PRE_LOPERACION'),
   ('%', 'PRE_LOPERACION'),
-  (E,),
-]
-grammar['LOGIC_OPERADOR'] = [
-  ('==','OPERACION','LOGIC_OPERADOR_2'),
-  ('!=','OPERACION','LOGIC_OPERADOR_2'),
-  ('==','OPERACION','LOGIC_OPERADOR_2'),
-  ('<' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('>' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('?' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('>=','OPERACION','LOGIC_OPERADOR_2'),
-  ('<=','OPERACION','LOGIC_OPERADOR_2'),
-]
-grammar['LOGIC_OPERADOR_2'] = [
-  ('==','OPERACION','LOGIC_OPERADOR_2'),
-  ('!=','OPERACION','LOGIC_OPERADOR_2'),
-  ('==','OPERACION','LOGIC_OPERADOR_2'),
-  ('<' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('>' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('?' ,'OPERACION','LOGIC_OPERADOR_2'),
-  ('>=','OPERACION','LOGIC_OPERADOR_2'),
-  ('<=','OPERACION','LOGIC_OPERADOR_2'),
   (E,),
 ]
 
